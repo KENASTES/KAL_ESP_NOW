@@ -44,6 +44,7 @@ class KAL_ESP_NOW {
     bool Add_Peer(const uint8_t* Mac_Address);
     bool Remove_Peer(const uint8_t* Mac_Address);
     void Esp_Now_Data_Sent(size_t length, uint8_t *data);
+    bool Upon_Send_data(const uint8_t *mac_addr, esp_now_send_status_t status);
     static void Esp_Now_Data_Receieve(const uint8_t * Mac_Address, const uint8_t *Received_Data, size_t length);
 };
 

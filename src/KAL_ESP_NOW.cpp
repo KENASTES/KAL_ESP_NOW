@@ -29,10 +29,6 @@ void KAL_ESP_NOW::Get_MAC_Address()
     }
 }
 
-void ESP_NOW_DATA_SENT(){
-
-}
-
 void GET_ESP_NOW_INIT_STATUS(){
     if (esp_now_init() == ESP_OK)
     {
@@ -40,6 +36,23 @@ void GET_ESP_NOW_INIT_STATUS(){
         return true;
     } else {
         Serial.println("ESP-NOW initialization failed.");
+        return false;
+    }
+}
+
+void ESP_NOW_DATA_SENT(size_t length, uint8_t *data){
+    esp_now_send(Mac_Address, data, length);
+    if (bool Upon_Send_data(esp_now_send_status_t status); == true){
+        Serial.println("Data sent successfully.");
+    } else {
+        Serial.println("Data send failed.");
+    }
+}
+
+bool KAL_ESP_NOW::Upon_Send_data(const uint8_t *mac_addr, esp_now_send_status_t status){
+    if (status == ESP_NOW_SEND_SUCCESS){
+        return true;
+    } else {
         return false;
     }
 }
