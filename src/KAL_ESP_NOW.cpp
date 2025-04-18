@@ -4,7 +4,20 @@ void KAL_ESP_NOW::PrintPeers()
 {
     esp_now_peer_num_t Totalpeer;
     esp_now_get_peer_num(&Totalpeer);
-    Serial.printf("TotalPeer : %d", Totalpeer.total_num);
+    Serial.printf("Memorized Peer : %d\n", Totalpeer.total_num);
+    for (size_t i = 0; i < Address_List.size(); i++)
+    {
+        const auto& Store_Mac_Address = Address_List[i];
+        Serial.print("Peer Address : ");
+        Serial.print(i + 1);
+        Serial.print(" : ");
+        for (int j = 0; j < 6; j++){
+            if (Store_Mac_Address[j] < 16) Serial.print("0");
+            Serial.print(Store_Mac_Address[j], HEX);
+            if (j < 5) Serial.print(":");
+        }
+        Serial.println();
+    }
 }
 
 void KAL_ESP_NOW::Setup_Esp_Now()
@@ -47,14 +60,17 @@ void KAL_ESP_NOW::Add_Peer(const uint8_t *Mac_Address)
 {
     memset(&Add_Peer_Info, 0, sizeof(Add_Peer_Info));
     memcpy(Add_Peer_Info.peer_addr, Mac_Address, 6);
-    Add_Peer_Info.channel = 0;              // ใช้ channel เดียวกัน
-    Add_Peer_Info.encrypt = false;          // ปิดการเข้ารหัส
-    Add_Peer_Info.ifidx = WIFI_IF_STA;      // ระบุ interface เป็น Station mode
+    Add_Peer_Info.channel = 0;
+    Add_Peer_Info.encrypt = false;
+    Add_Peer_Info.ifidx = WIFI_IF_STA;
 
     esp_err_t result = esp_now_add_peer(&Add_Peer_Info);
     if (result == ESP_OK)
     {
         Serial.println("Peer added successfully.");
+        std::array<uint8_t, 6> Store_Mac_Address;
+        memcpy(Store_Mac_Address.data(), Mac_Address, 6);
+        Address_List.push_back(Store_Mac_Address);
     }
     else if (result == ESP_ERR_ESPNOW_NOT_INIT)
     {
@@ -146,7 +162,7 @@ void KAL_ESP_NOW::Register_Receive_Callback() {
     esp_now_register_recv_cb(Esp_Now_Data_Receieve);
 }
 
-void KAL_ESP_NOW::Esp_Now_Data_Receieve(const uint8_t *Mac_Address, const uint8_t *Received_Data, size_t length)
+void KAL_ESP_NOW::Esp_Now_Data_Receieve(const uint8_t *Mac_Address, const uint8_t *Received_Data, int length)
 {
     char Mac_Destination_Address[18];
     snprintf(Mac_Destination_Address, sizeof(Mac_Destination_Address), "%02X:%02X:%02X:%02X:%02X:%02X",
