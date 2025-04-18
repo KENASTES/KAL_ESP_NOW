@@ -128,13 +128,13 @@ void KAL_ESP_NOW::Esp_Now_Data_Sent(size_t length, const void *data)
 {
     esp_now_send(Address, (const uint8_t*)data, length);
     esp_err_t result = esp_now_send(Address, (const uint8_t*)data, length);
-    if (result == true)
+    if (result == ESP_OK)
     {
         Serial.println("Data sent successfully.");
     }
     else
     {
-        Serial.println("Data send failed.");
+        Serial.printf("Data send failed. Error code: %d\n", result);
     }
 }
 
