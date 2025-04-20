@@ -14,9 +14,10 @@
 
 class KAL_ESP_NOW {
     public:
-    esp_now_peer_info_t Add_Peer_Info;
+    esp_now_peer_info_t Peer_Info;
     uint8_t Address[6];
     bool EspNow_Initialized = false;
+
     KAL_ESP_NOW(){   
     
     }
@@ -38,6 +39,7 @@ class KAL_ESP_NOW {
     void Get_MAC_Address();
     bool Get_Esp_Now_Init_Status();
     void Register_Receive_Callback();
+    bool Select_Peer(const uint8_t index);
     void Add_Peer(const uint8_t *Mac_Address);
     void Remove_Peer(const uint8_t *Mac_Address);
     void Esp_Now_Data_Sent(size_t length, const void *data);
