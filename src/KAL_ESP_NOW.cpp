@@ -1,25 +1,14 @@
 #include <KAL_ESP_NOW.h>
 
-void KAL_ESP_NOW::PrintPeers()
+void *KAL_ESP_NOW::Tranfering_Struct = nullptr;
+size_t KAL_ESP_NOW::Tranfering_StructSize = 0;
+
+void KAL_ESP_NOW::Print_Peers_List()
 {
-    esp_now_peer_num_t Totalpeer;
-    esp_now_get_peer_num(&Totalpeer);
-    Serial.printf("Memorized Peer : %d\n", Totalpeer.total_num);
-    for (size_t i = 0; i < Address_List.size(); i++)
-    {
-        const auto &Store_Mac_Address = Address_List[i];
-        Serial.print("Peer Address : ");
-        Serial.print(i + 1);
-        Serial.print(" : ");
-        for (int j = 0; j < 6; j++)
-        {
-            if (Store_Mac_Address[j] < 16)
-                Serial.print("0");
-            Serial.print(Store_Mac_Address[j], HEX);
-            if (j < 5)
-                Serial.print(":");
-        }
-        Serial.println();
+    for (int i = 0; i < Memorized_Peers.size(); ++i) {
+        const auto& ESP_NOW_MAC_ADDR = Memorized_Peers[i];
+        Serial.printf("[%d] %02X:%02X:%02X:%02X:%02X:%02X\n", i,
+                      ESP_NOW_MAC_ADDR[0], ESP_NOW_MAC_ADDR[1], ESP_NOW_MAC_ADDR[2], ESP_NOW_MAC_ADDR[3], ESP_NOW_MAC_ADDR[4], ESP_NOW_MAC_ADDR[5]);
     }
 }
 
@@ -61,19 +50,25 @@ bool KAL_ESP_NOW::Get_Esp_Now_Init_Status()
 
 void KAL_ESP_NOW::Add_Peer(const uint8_t *Mac_Address)
 {
-    memset(&Peer_Info, 0, sizeof(Add_Peer_Info));
+    std::array<uint8_t, 6> Adding_Address;
+    memcpy(Adding_Address.data(), Mac_Address, 6);
+
+    if (Is_Peer_Exists(Mac_Address))
+    {
+        Serial.println("This peer is already exists.");
+        return;
+    }
+
+    esp_now_peer_info_t Peer_Info = {};
     memcpy(Peer_Info.peer_addr, Mac_Address, 6);
     Peer_Info.channel = 0;
     Peer_Info.encrypt = false;
     Peer_Info.ifidx = WIFI_IF_STA;
 
-    esp_err_t result = esp_now_add_peer(&Add_Peer_Info);
+    esp_err_t result = esp_now_add_peer(&Peer_Info);
     if (result == ESP_OK)
     {
         Serial.println("Peer added successfully.");
-        std::array<uint8_t, 6> Store_Mac_Address;
-        memcpy(Store_Mac_Address.data(), Mac_Address, 6);
-        Address_List.push_back(Store_Mac_Address);
     }
     else if (result == ESP_ERR_ESPNOW_NOT_INIT)
     {
@@ -101,51 +96,17 @@ void KAL_ESP_NOW::Add_Peer(const uint8_t *Mac_Address)
     }
 }
 
-void KAL_ESP_NOW::Remove_Peer(const uint8_t *Mac_Address)
-{
-
-    esp_now_del_peer(Mac_Address);
-    esp_err_t result = esp_now_del_peer(Mac_Address);
-    if (result == ESP_OK)
-    {
-        Serial.println("Peer removed successfully.");
-    }
-    else if (result == ESP_ERR_ESPNOW_NOT_INIT)
-    {
-        Serial.println("ESP-NOW not initialized.");
-    }
-    else if (result == ESP_ERR_ESPNOW_ARG)
-    {
-        Serial.println("Invalid argument.");
-    }
-    else if (result == ESP_ERR_ESPNOW_NOT_FOUND)
-    {
-        Serial.println("Peer not found.");
-    }
-    else
-    {
-        Serial.println("Failed to remove peer.");
-    }
-}
-
 bool KAL_ESP_NOW::Select_Peer(const uint8_t index)
 {
-    const uint8_t Address_Index = Address_List.size();
-    if (index < Address_Index)
-    {
-        memcpy(Address, Address_List[index].data(), 6);
+    if (index >= 0 && index < Memorized_Peers.size()) {
+        Selected_Peer_Index = index;
         return true;
     }
-    else
-    {
-        Serial.println("Invalid Peer Index.");
-        return false;
-    }
+    return false;
 }
 
 void KAL_ESP_NOW::Esp_Now_Data_Sent(size_t length, const void *data)
 {
-    esp_now_send(Address, (const uint8_t *)data, length);
     esp_err_t result = esp_now_send(Address, (const uint8_t *)data, length);
     if (result == ESP_OK)
     {
@@ -157,24 +118,11 @@ void KAL_ESP_NOW::Esp_Now_Data_Sent(size_t length, const void *data)
     }
 }
 
-bool KAL_ESP_NOW::Upon_Send_data(const uint8_t *mac_addr, esp_now_send_status_t status)
+void KAL_ESP_NOW::Esp_Now_Data_Receieve(const uint8_t *Mac_Address, const uint8_t *Received_Data, int length)
 {
-    char Mac_Destination_Address[18];
-    snprintf(Mac_Destination_Address, sizeof(Mac_Destination_Address), "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac_addr[0], mac_addr[1],
-             mac_addr[2], mac_addr[3],
-             mac_addr[4], mac_addr[5]);
-
-    if (status == ESP_NOW_SEND_SUCCESS)
-    {
-        Serial.printf("Data sent to %s successfully.\n", Mac_Destination_Address);
-        return true;
-    }
-    else
-    {
-        Serial.printf("Data send to %s failed.\n", Mac_Destination_Address);
-        return false;
-    }
+    if (Tranfering_Struct && Tranfering_StructSize > 0 && length >= Tranfering_StructSize) {
+    memcpy(Tranfering_Struct, Received_Data, Tranfering_StructSize);
+  }
 }
 
 void KAL_ESP_NOW::Register_Receive_Callback()
@@ -182,18 +130,7 @@ void KAL_ESP_NOW::Register_Receive_Callback()
     esp_now_register_recv_cb(Esp_Now_Data_Receieve);
 }
 
-void KAL_ESP_NOW::Esp_Now_Data_Receieve(const uint8_t *Mac_Address, const uint8_t *Received_Data, int length)
-{
-    char Mac_Destination_Address[18];
-    snprintf(Mac_Destination_Address, sizeof(Mac_Destination_Address), "%02X:%02X:%02X:%02X:%02X:%02X",
-             Mac_Address[0], Mac_Address[1],
-             Mac_Address[2], Mac_Address[3],
-             Mac_Address[4], Mac_Address[5]);
-
-    Serial.printf("Data received from %s : ", Mac_Destination_Address);
-    for (int i = 0; i < length; i++)
-    {
-        Serial.printf("%d ", Received_Data[i]);
-    }
-    Serial.println();
+void KAL_ESP_NOW::Esp_Now_Struct_Tranfer(void *Tranfer_target, size_t Tranfer_targetsize){
+    KAL_ESP_NOW::Tranfering_Struct = Tranfer_target;
+    KAL_ESP_NOW::Tranfering_StructSize = Tranfer_targetsize;
 }
